@@ -23,8 +23,8 @@ public class NotificacoesPlugin extends Plugin {
 
     @PluginMethod
     public void temPermissao(PluginCall call) {
-        boolean ativo = NotificationManagerCompat.getEnabledListenerPackageNames(getContext())
-                .contains(getContext().getPackageName());
+String lista = Settings.Secure.getString(getContext().getContentResolver(), "enabled_notification_listeners");
+boolean ativo = lista != null && lista.contains(getContext().getPackageName());
         JSObject r = new JSObject();
         r.put("ativo", ativo);
         call.resolve(r);
