@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gestor Financeiro</title>
 <style>
+  [hidden] { display:none !important; }
   :root { --fundo:#eef1f5; --card:#fff; --tinta:#14213d; --suave:#5b6577; --entra:#0f8b6d; --sai:#c2410c; --acento:#2a4fd6; }
   * { box-sizing: border-box; }
   body { margin:0; padding:max(16px, env(safe-area-inset-top)) 16px 32px; background:var(--fundo); color:var(--tinta); font:16px/1.4 system-ui, sans-serif; }
@@ -22,8 +23,10 @@
   .mov:first-child { border-top:0; }
   .mov small { color:var(--suave); display:block; }
   .mov span:first-child { min-width:0; overflow-wrap:anywhere; }
-  .vazio { color:var(--suave); }
+  .vazio { color:var(--suave); margin:0; }
   .nao small { overflow-wrap:anywhere; }
+  .diag p { margin:4px 0; font-size:14px; overflow-wrap:anywhere; }
+  .ok { color:var(--entra); } .ruim { color:var(--sai); }
 </style>
 </head>
 <body>
@@ -45,14 +48,28 @@
 <h2>Notificações com valor que não reconheci</h2>
 <div class="caixa nao" id="naoRec"><p class="vazio">Nada por aqui.</p></div>
 
+<h2>Diagnóstico</h2>
+<div class="caixa diag" id="diag"><p>Carregando...</p></div>
+
 <script src="parser.js"></script>
 <script>
-  var N = Capacitor.registerPlugin('Notificacoes');
   var brl = function (v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
   var ler = function (k) { try { return JSON.parse(localStorage.getItem(k)) || []; } catch (e) { return []; } };
-  var gravar = function (k, v) { localStorage.setItem(k, JSON.stringify(v)); };
-
+  var gravar = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  var erro = '';
   function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // Fala com a parte nativa (Android). Funciona mesmo sem bundler.
+  function chamar(metodo) {
+    var C = window.Capacitor;
+    if (!C) return Promise.reject(new Error('Capacitor não carregou'));
+    var P = C.Plugins && C.Plugins.Notificacoes;
+    if (P && typeof P[metodo] === 'function') return P[metodo]({});
+    if (typeof C.nativePromise === 'function') return C.nativePromise('Notificacoes', metodo, {});
+    return Promise.reject(new Error('Leitor de notificações não encontrado no app'));
+  }
+
+  function linha(ok, texto) { return '<p class="' + (ok ? 'ok' : 'ruim') + '">' + (ok ? '✓ ' : '✗ ') + esc(texto) + '</p>'; }
 
   function desenhar() {
     var movs = ler('movs').sort(function (a, b) { return b.data.localeCompare(a.data); });
@@ -76,9 +93,9 @@
   }
 
   async function processarFila() {
-    var r = await N.lerFila();
+    var r = await chamar('lerFila');
     var movs = ler('movs'), nr = ler('naoRec');
-    r.itens.forEach(function (n) {
+    (r.itens || []).forEach(function (n) {
       var m = Parser.interpretar(n);
       if (m) { if (!movs.some(function (x) { return x.id === m.id; })) movs.push(m); }
       else { nr.unshift(n); }
@@ -88,15 +105,30 @@
   }
 
   async function atualizar() {
-    var p = await N.temPermissao();
-    document.getElementById('aviso').hidden = p.ativo;
-    await processarFila();
+    var d = document.getElementById('diag');
+    try {
+      var s = await chamar('status');
+      document.getElementById('aviso').hidden = !!s.ativo;
+      await processarFila();
+      d.innerHTML =
+        linha(true, 'Leitor de notificações carregado') +
+        linha(s.ativo, s.ativo ? 'Acesso às notificações liberado' : 'Acesso às notificações NÃO liberado') +
+        linha(s.conectado, s.conectado ? 'Android conectou o leitor' : 'Android ainda não conectou o leitor') +
+        '<p>Notificações vistas: ' + s.vistas + ' · com valor (R$): ' + s.capturadas + '</p>' +
+        (erro ? linha(false, erro) : '');
+    } catch (e) {
+      d.innerHTML = linha(false, 'Erro: ' + (e && e.message ? e.message : e));
+    }
   }
 
-  document.getElementById('liberar').onclick = function () { N.abrirConfiguracoes(); };
-  N.addListener('nova', processarFila);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) atualizar(); });
+  document.getElementById('liberar').onclick = async function () {
+    try { await chamar('abrirConfiguracoes'); }
+    catch (e) { erro = 'Não consegui abrir as configurações: ' + (e && e.message ? e.message : e); atualizar(); }
+  };
+  window.onerror = function (msg) { erro = String(msg); };
+
   desenhar(); atualizar();
+  setInterval(function () { if (!document.hidden) atualizar(); }, 3000);
 </script>
 </body>
 </html>
