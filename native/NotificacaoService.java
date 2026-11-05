@@ -1,6 +1,7 @@
 package com.gestor.financeiro;
 
 import android.app.Notification;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -16,10 +17,24 @@ public class NotificacaoService extends NotificationListenerService {
     static final String CHAVE = "itens";
 
     @Override
+    public void onListenerConnected() {
+        prefs(getApplicationContext()).edit().putBoolean("conectado", true).apply();
+    }
+
+    @Override
+    public void onListenerDisconnected() {
+        prefs(getApplicationContext()).edit().putBoolean("conectado", false).apply();
+        try { requestRebind(new ComponentName(this, NotificacaoService.class)); } catch (Exception ignorado) { }
+    }
+
+    @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         try {
+            Context ctx = getApplicationContext();
+            SharedPreferences sp = prefs(ctx);
+            sp.edit().putInt("vistas", sp.getInt("vistas", 0) + 1).apply();
+
             Notification n = sbn.getNotification();
-            if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
             Bundle e = n.extras;
             String titulo = texto(e.getCharSequence(Notification.EXTRA_TITLE));
             String corpo = texto(e.getCharSequence(Notification.EXTRA_BIG_TEXT));
@@ -32,22 +47,25 @@ public class NotificacaoService extends NotificationListenerService {
             o.put("texto", corpo);
             o.put("quando", sbn.getPostTime());
             o.put("chave", sbn.getKey());
-            guardar(getApplicationContext(), o);
-            NotificacoesPlugin.avisar();
+            guardar(ctx, o);
         } catch (Exception ignorado) { }
+    }
+
+    private static SharedPreferences prefs(Context ctx) {
+        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private static String texto(CharSequence c) { return c == null ? "" : c.toString(); }
 
     static synchronized void guardar(Context ctx, JSONObject o) throws Exception {
-        SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences sp = prefs(ctx);
         JSONArray arr = new JSONArray(sp.getString(CHAVE, "[]"));
         arr.put(o);
-        sp.edit().putString(CHAVE, arr.toString()).apply();
+        sp.edit().putString(CHAVE, arr.toString()).putInt("capturadas", sp.getInt("capturadas", 0) + 1).apply();
     }
 
     static synchronized String retirarTudo(Context ctx) {
-        SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences sp = prefs(ctx);
         String s = sp.getString(CHAVE, "[]");
         sp.edit().remove(CHAVE).apply();
         return s;
