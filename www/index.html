@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gestor Financeiro</title>
+<style>
+  :root { --fundo:#eef1f5; --card:#fff; --tinta:#14213d; --suave:#5b6577; --entra:#0f8b6d; --sai:#c2410c; --acento:#2a4fd6; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:max(16px, env(safe-area-inset-top)) 16px 32px; background:var(--fundo); color:var(--tinta); font:16px/1.4 system-ui, sans-serif; }
+  h1 { font-size:22px; margin:8px 0 16px; }
+  h2 { font-size:15px; margin:24px 0 8px; color:var(--suave); font-weight:600; }
+  .caixa { background:var(--card); border-radius:14px; padding:14px 16px; }
+  .totais { display:flex; gap:12px; }
+  .totais div { flex:1; }
+  .totais small { color:var(--suave); display:block; }
+  .totais b { font-size:20px; }
+  .entra { color:var(--entra); } .sai { color:var(--sai); }
+  button { font:inherit; background:var(--acento); color:#fff; border:0; border-radius:10px; padding:10px 14px; }
+  .aviso { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+  .mov { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid #e3e7ee; }
+  .mov:first-child { border-top:0; }
+  .mov small { color:var(--suave); display:block; }
+  .mov span:first-child { min-width:0; overflow-wrap:anywhere; }
+  .vazio { color:var(--suave); }
+  .nao small { overflow-wrap:anywhere; }
+</style>
+</head>
+<body>
+<h1>Gestor Financeiro</h1>
+
+<div id="aviso" class="caixa aviso" hidden>
+  <span>Falta liberar o acesso às notificações.</span>
+  <button id="liberar">Liberar</button>
+</div>
+
+<div class="caixa totais">
+  <div><small>Entradas</small><b class="entra" id="tEntra">R$ 0,00</b></div>
+  <div><small>Saídas</small><b class="sai" id="tSai">R$ 0,00</b></div>
+</div>
+
+<h2>Movimentações</h2>
+<div class="caixa" id="lista"><p class="vazio">Nenhuma movimentação ainda. Faça um Pix ou uma compra para testar.</p></div>
+
+<h2>Notificações com valor que não reconheci</h2>
+<div class="caixa nao" id="naoRec"><p class="vazio">Nada por aqui.</p></div>
+
+<script src="parser.js"></script>
+<script>
+  var N = Capacitor.registerPlugin('Notificacoes');
+  var brl = function (v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
+  var ler = function (k) { try { return JSON.parse(localStorage.getItem(k)) || []; } catch (e) { return []; } };
+  var gravar = function (k, v) { localStorage.setItem(k, JSON.stringify(v)); };
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function desenhar() {
+    var movs = ler('movs').sort(function (a, b) { return b.data.localeCompare(a.data); });
+    var ent = 0, sai = 0;
+    movs.forEach(function (m) { if (m.sinal > 0) ent += m.valor; else sai += m.valor; });
+    document.getElementById('tEntra').textContent = brl(ent);
+    document.getElementById('tSai').textContent = brl(sai);
+    if (movs.length) {
+      document.getElementById('lista').innerHTML = movs.map(function (m) {
+        var quando = new Date(m.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return '<div class="mov"><span>' + esc(m.descricao) + '<small>' + esc(m.banco + ' · ' + m.categoria + ' · ' + quando) + '</small></span>' +
+          '<b class="' + (m.sinal > 0 ? 'entra' : 'sai') + '">' + (m.sinal > 0 ? '+' : '−') + brl(m.valor) + '</b></div>';
+      }).join('');
+    }
+    var nr = ler('naoRec');
+    if (nr.length) {
+      document.getElementById('naoRec').innerHTML = nr.map(function (n) {
+        return '<div class="mov"><span>' + esc(n.texto) + '<small>' + esc(n.pacote) + '</small></span></div>';
+      }).join('');
+    }
+  }
+
+  async function processarFila() {
+    var r = await N.lerFila();
+    var movs = ler('movs'), nr = ler('naoRec');
+    r.itens.forEach(function (n) {
+      var m = Parser.interpretar(n);
+      if (m) { if (!movs.some(function (x) { return x.id === m.id; })) movs.push(m); }
+      else { nr.unshift(n); }
+    });
+    gravar('movs', movs); gravar('naoRec', nr.slice(0, 20));
+    desenhar();
+  }
+
+  async function atualizar() {
+    var p = await N.temPermissao();
+    document.getElementById('aviso').hidden = p.ativo;
+    await processarFila();
+  }
+
+  document.getElementById('liberar').onclick = function () { N.abrirConfiguracoes(); };
+  N.addListener('nova', processarFila);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) atualizar(); });
+  desenhar(); atualizar();
+</script>
+</body>
+</html>
