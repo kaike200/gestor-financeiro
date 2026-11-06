@@ -3,132 +3,99 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>Gestor Financeiro</title>
-<style>
-  [hidden] { display:none !important; }
-  :root { --fundo:#eef1f5; --card:#fff; --tinta:#14213d; --suave:#5b6577; --entra:#0f8b6d; --sai:#c2410c; --acento:#2a4fd6; }
-  * { box-sizing: border-box; }
-  body { margin:0; padding:max(16px, env(safe-area-inset-top)) 16px 32px; background:var(--fundo); color:var(--tinta); font:16px/1.4 system-ui, sans-serif; }
-  h1 { font-size:22px; margin:8px 0 16px; }
-  h2 { font-size:15px; margin:24px 0 8px; color:var(--suave); font-weight:600; }
-  .caixa { background:var(--card); border-radius:14px; padding:14px 16px; }
-  .totais { display:flex; gap:12px; }
-  .totais div { flex:1; }
-  .totais small { color:var(--suave); display:block; }
-  .totais b { font-size:20px; }
-  .entra { color:var(--entra); } .sai { color:var(--sai); }
-  button { font:inherit; background:var(--acento); color:#fff; border:0; border-radius:10px; padding:10px 14px; }
-  .aviso { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
-  .mov { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid #e3e7ee; }
-  .mov:first-child { border-top:0; }
-  .mov small { color:var(--suave); display:block; }
-  .mov span:first-child { min-width:0; overflow-wrap:anywhere; }
-  .vazio { color:var(--suave); margin:0; }
-  .nao small { overflow-wrap:anywhere; }
-  .diag p { margin:4px 0; font-size:14px; overflow-wrap:anywhere; }
-  .ok { color:var(--entra); } .ruim { color:var(--sai); }
-</style>
+<link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-<h1>Gestor Financeiro</h1>
+<main>
+  <!-- INÍCIO -->
+  <section id="t-inicio" class="tela ativa">
+    <div id="aviso" class="card aviso" hidden>
+      <span>Falta liberar o acesso às notificações.</span>
+      <button id="liberar" class="btn">Liberar</button>
+    </div>
 
-<div id="aviso" class="caixa aviso" hidden>
-  <span>Falta liberar o acesso às notificações.</span>
-  <button id="liberar">Liberar</button>
-</div>
+    <div class="hero">
+      <small>Saldo na Caixa</small>
+      <b id="saldo" class="grande">R$ 0,00</b>
+      <span id="saldoInfo"></span>
+    </div>
 
-<div class="caixa totais">
-  <div><small>Entradas</small><b class="entra" id="tEntra">R$ 0,00</b></div>
-  <div><small>Saídas</small><b class="sai" id="tSai">R$ 0,00</b></div>
-</div>
+    <div class="mes">
+      <button id="mAnt" class="seta" aria-label="Mês anterior">‹</button>
+      <b id="mesNome"></b>
+      <button id="mProx" class="seta" aria-label="Próximo mês">›</button>
+    </div>
+    <div class="duo">
+      <div class="card mini"><small>Entradas</small><b id="tEnt" class="in">R$ 0,00</b></div>
+      <div class="card mini"><small>Saídas</small><b id="tSai" class="out">R$ 0,00</b></div>
+    </div>
+    <div id="atencao" class="card atencao" hidden></div>
 
-<h2>Movimentações</h2>
-<div class="caixa" id="lista"><p class="vazio">Nenhuma movimentação ainda. Faça um Pix ou uma compra para testar.</p></div>
+    <h2>Gastos por categoria</h2>
+    <div class="card" id="boxRosca"></div>
 
-<h2>Notificações com valor que não reconheci</h2>
-<div class="caixa nao" id="naoRec"><p class="vazio">Nada por aqui.</p></div>
+    <h2>Últimos 7 dias</h2>
+    <div class="card" id="boxBarras"></div>
 
-<h2>Diagnóstico</h2>
-<div class="caixa diag" id="diag"><p>Carregando...</p></div>
+    <div class="h2linha"><h2>Recentes</h2><button class="link" data-ir="movs">Ver todas</button></div>
+    <div class="card lista" id="recentes"></div>
+  </section>
+
+  <!-- MOVIMENTAÇÕES -->
+  <section id="t-movs" class="tela">
+    <input id="busca" class="busca" type="search" placeholder="Buscar por nome, categoria ou valor" autocomplete="off">
+    <div class="chips" id="chTipo">
+      <button class="chip on" data-tipo="todas">Todas</button>
+      <button class="chip" data-tipo="entradas">Entradas</button>
+      <button class="chip" data-tipo="saidas">Saídas</button>
+    </div>
+    <div class="chips" id="chPeriodo">
+      <button class="chip on" data-periodo="mes">Este mês</button>
+      <button class="chip" data-periodo="passado">Mês passado</button>
+      <button class="chip" data-periodo="7d">7 dias</button>
+      <button class="chip" data-periodo="tudo">Tudo</button>
+    </div>
+    <div id="resumoFiltro" class="dia"></div>
+    <div id="listaMovs"></div>
+  </section>
+
+  <!-- MAIS -->
+  <section id="t-mais" class="tela">
+    <h2>Conta</h2>
+    <div class="card">
+      <div class="linha" style="border-top:0"><span>Saldo inicial</span><span id="mSaldoIni">—</span></div>
+      <div class="linha"><span>Contado desde</span><span id="mDesde">—</span></div>
+      <button id="alterarSaldo" class="btn">Alterar saldo inicial</button>
+    </div>
+    <h2>Notificações com valor que não reconheci</h2>
+    <div class="card" id="naoRec"><p class="vazio">Nada por aqui.</p></div>
+    <h2>Diagnóstico</h2>
+    <div class="card diag" id="diag"><p>Carregando...</p></div>
+    <p class="rodape">Gestor Financeiro · versão 0.2</p>
+  </section>
+</main>
+
+<nav id="nav">
+  <button class="on" data-ir="inicio"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Início</button>
+  <button data-ir="movs"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Movimentações</button>
+  <button data-ir="mais"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>Mais</button>
+</nav>
+
+<!-- detalhe de uma movimentação -->
+<div id="fundoDetalhe" class="fundo"><div class="folha" id="detalhe"></div></div>
+
+<!-- saldo inicial -->
+<div id="fundoSaldo" class="fundo"><div class="folha">
+  <h3 id="saldoTitulo">Qual é o saldo atual da sua conta Caixa?</h3>
+  <small style="color:var(--mute)">O app conta as movimentações a partir de agora.</small>
+  <input id="saldoCampo" class="campo" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+  <p id="saldoErro" class="erro"></p>
+  <button id="saldoOk" class="btn">Salvar</button>
+</div></div>
 
 <script src="parser.js"></script>
-<script>
-  var brl = function (v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
-  var ler = function (k) { try { return JSON.parse(localStorage.getItem(k)) || []; } catch (e) { return []; } };
-  var gravar = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-  var erro = '';
-  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-  // Fala com a parte nativa (Android). Funciona mesmo sem bundler.
-  function chamar(metodo) {
-    var C = window.Capacitor;
-    if (!C) return Promise.reject(new Error('Capacitor não carregou'));
-    var P = C.Plugins && C.Plugins.Notificacoes;
-    if (P && typeof P[metodo] === 'function') return P[metodo]({});
-    if (typeof C.nativePromise === 'function') return C.nativePromise('Notificacoes', metodo, {});
-    return Promise.reject(new Error('Leitor de notificações não encontrado no app'));
-  }
-
-  function linha(ok, texto) { return '<p class="' + (ok ? 'ok' : 'ruim') + '">' + (ok ? '✓ ' : '✗ ') + esc(texto) + '</p>'; }
-
-  function desenhar() {
-    var movs = ler('movs').sort(function (a, b) { return b.data.localeCompare(a.data); });
-    var ent = 0, sai = 0;
-    movs.forEach(function (m) { if (m.sinal > 0) ent += m.valor; else sai += m.valor; });
-    document.getElementById('tEntra').textContent = brl(ent);
-    document.getElementById('tSai').textContent = brl(sai);
-    if (movs.length) {
-      document.getElementById('lista').innerHTML = movs.map(function (m) {
-        var quando = new Date(m.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-        return '<div class="mov"><span>' + esc(m.descricao) + '<small>' + esc(m.banco + ' · ' + m.categoria + ' · ' + quando) + '</small></span>' +
-          '<b class="' + (m.sinal > 0 ? 'entra' : 'sai') + '">' + (m.sinal > 0 ? '+' : '−') + brl(m.valor) + '</b></div>';
-      }).join('');
-    }
-    var nr = ler('naoRec');
-    if (nr.length) {
-      document.getElementById('naoRec').innerHTML = nr.map(function (n) {
-        return '<div class="mov"><span>' + esc(n.texto) + '<small>' + esc(n.pacote) + '</small></span></div>';
-      }).join('');
-    }
-  }
-
-  async function processarFila() {
-    var r = await chamar('lerFila');
-    var movs = ler('movs'), nr = ler('naoRec');
-    (r.itens || []).forEach(function (n) {
-      var m = Parser.interpretar(n);
-      if (m) { if (!movs.some(function (x) { return x.id === m.id; })) movs.push(m); }
-      else { nr.unshift(n); }
-    });
-    gravar('movs', movs); gravar('naoRec', nr.slice(0, 20));
-    desenhar();
-  }
-
-  async function atualizar() {
-    var d = document.getElementById('diag');
-    try {
-      var s = await chamar('status');
-      document.getElementById('aviso').hidden = !!s.ativo;
-      await processarFila();
-      d.innerHTML =
-        linha(true, 'Leitor de notificações carregado') +
-        linha(s.ativo, s.ativo ? 'Acesso às notificações liberado' : 'Acesso às notificações NÃO liberado') +
-        linha(s.conectado, s.conectado ? 'Android conectou o leitor' : 'Android ainda não conectou o leitor') +
-        '<p>Notificações vistas: ' + s.vistas + ' · com valor (R$): ' + s.capturadas + '</p>' +
-        (erro ? linha(false, erro) : '');
-    } catch (e) {
-      d.innerHTML = linha(false, 'Erro: ' + (e && e.message ? e.message : e));
-    }
-  }
-
-  document.getElementById('liberar').onclick = async function () {
-    try { await chamar('abrirConfiguracoes'); }
-    catch (e) { erro = 'Não consegui abrir as configurações: ' + (e && e.message ? e.message : e); atualizar(); }
-  };
-  window.onerror = function (msg) { erro = String(msg); };
-
-  desenhar(); atualizar();
-  setInterval(function () { if (!document.hidden) atualizar(); }, 3000);
-</script>
+<script src="app.js"></script>
 </body>
 </html>

@@ -50,6 +50,7 @@
         r.id = (n.chave || n.quando) + '|' + n.texto;
         r.categoria = r.sinal > 0 ? 'Entrada' : categoria(r.descricao);
         r.pacote = n.pacote;
+        r.recebida = new Date(n.quando).toISOString();
         return r;
       }
     }
